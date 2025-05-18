@@ -7,9 +7,13 @@ const fs = require("fs");
 const createMenu = require("./src/main_utils/menu");
 const windowStateKeeper = require("electron-window-state");
 const { autoUpdater } = require("electron-updater");
+const xmlrpc = require("xmlrpc");
 
 let isAppReady = false;
 let isMacOpenTriggered = false;
+// XML-RPC: Store last opened file path and data for getSeqJson
+let lastOpenedFilePath = null;
+let lastSeqJson = null;
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 const windows = [];
@@ -150,6 +154,65 @@ app.on("ready", async () => {
     }
     createWindow({ filePath: path, initialSeqJson });
   }
+
+  // Start XML-RPC server
+  const xmlrpcServer = xmlrpc.createServer({ host: '127.0.0.1', port: 9091 }, () => {
+    console.log('XML-RPC server listening on port 9091');
+  });
+
+  // XML-RPC: openFile
+  xmlrpcServer.on('openFile', async function (err, params, callback) {
+    if (!params || !params[0]) {
+      callback({ faultCode: 400, faultString: 'File path required' });
+      return;
+    }
+    const filePath = params[0];
+    try {
+      const seqJson = await getSeqJsonFromPath(filePath);
+      // Optionally open window/ui
+      createWindow({ filePath, initialSeqJson: seqJson });
+      // Save state for getSeqJson
+      lastOpenedFilePath = filePath;
+      lastSeqJson = seqJson;
+      callback(null, { status: 'ok', name: seqJson && seqJson.name, circular: seqJson && seqJson.circular });
+    } catch (error) {
+      callback({ faultCode: 500, faultString: error.message });
+    }
+  });
+
+  // XML-RPC: getSeqJson
+  xmlrpcServer.on('getSeqJson', async function (err, params, callback) {
+    try {
+      // If a path param provided, reload and return
+      if (params && params[0]) {
+        const seqJson = await getSeqJsonFromPath(params[0]);
+        callback(null, seqJson);
+      } else if (lastSeqJson) {
+        callback(null, lastSeqJson);
+      } else {
+        callback({ faultCode: 404, faultString: 'No sequence in memory.' });
+      }
+    } catch (error) {
+      callback({ faultCode: 500, faultString: error.message });
+    }
+  });
+
+  // XML-RPC: generic OVE command invoke
+  xmlrpcServer.on('invoke', async function (_err, params, callback) {
+    // params[0] = commandName, params[1] = args
+    try {
+      const command = params && params[0];
+      const args = (params && params[1]) || {};
+      // Find focused OVE window (simplified: last in array)
+      const target = windows.length ? windows[windows.length-1].bw : null;
+      if (!target) return callback({ faultCode: 404, faultString: 'No OVE window' });
+      // Use IPC to renderer
+      const result = await target.webContents.executeJavaScript(`window.oveRpcHandler && window.oveRpcHandler(${JSON.stringify(command)}, ${JSON.stringify(args)})`);
+      callback(null, result);
+    } catch (e) {
+      callback({ faultCode: 500, faultString: e.message });
+    }
+  });
 });
 
 // Quit when all windows are closed.

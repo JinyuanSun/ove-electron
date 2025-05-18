@@ -1,3 +1,4 @@
+
 // This window.initialSeqJson is getting set in preload from the query string from the main process load() call
 const seqDataToUse = window.initialSeqJson || { circular: true };
 // export default generateSequenceData()
@@ -8,6 +9,25 @@ setNewTitle(seqDataToUse.name);
 function setNewTitle(name) {
   document.title = originalTitle + " -- " + (name || "Untitled Sequence");
 }
+
+// OVE XML-RPC function dispatcher (for main process)
+// This should be extended as needed to match OVE's internal API
+window.oveRpcHandler = async (command, args) => {
+  try {
+    switch (command) {
+      case 'getSequence':
+        return seqDataToUse;
+      case 'setTitle':
+        setNewTitle(args && args.name);
+        return { ok: true };
+      // Add more as needed
+      default:
+        return { error: `Unknown OVE RPC command: ${command}` };
+    }
+  } catch (e) {
+    return { error: e.message };
+  }
+};
 
 const handleSave =
   (isSaveAs) =>

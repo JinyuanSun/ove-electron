@@ -7,9 +7,16 @@ const { ipcRenderer, contextBridge } = require("electron");
 
 // Adds an object 'api' to the global window object:
 contextBridge.exposeInMainWorld("api", {
-  send: async (type, arg) => {
-    return await ipcRenderer.invoke(type, arg);
-  },
+  send: async (type, arg) => ipcRenderer.invoke(type, arg),
+});
+
+// OVE RPC handler—expose to Electron main
+contextBridge.exposeInMainWorld("oveRpcHandler", async (command, args) => {
+  // Will be implemented in renderer.js at window.oveRpcHandler
+  if (window && window.oveRpcHandler) {
+    return await window.oveRpcHandler(command, args);
+  }
+  return { error: "No oveRpcHandler defined in renderer." };
 });
 
 // Add the initial seq data to the renderer window
