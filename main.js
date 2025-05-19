@@ -213,6 +213,26 @@ app.on("ready", async () => {
       callback({ faultCode: 500, faultString: e.message });
     }
   });
+
+  // XML-RPC: createFeature for selected DNA sequence
+  xmlrpcServer.on('createFeature', async function (_err, params, callback) {
+    try {
+      // params[0]: {start, end, name, type, strand}
+      const featureData = params && params[0];
+      if (!featureData || featureData.start == null || featureData.end == null) {
+        return callback({ faultCode: 400, faultString: 'Feature start/end required.' });
+      }
+      const target = windows.length ? windows[windows.length-1].bw : null;
+      if (!target) return callback({ faultCode: 404, faultString: 'No OVE window' });
+      // Invoke renderer's handler
+      const response = await target.webContents.executeJavaScript(
+        `window.oveRpcHandler && window.oveRpcHandler('createFeature', ${JSON.stringify(featureData)})`
+      );
+      callback(null, response);
+    } catch (e) {
+      callback({ faultCode: 500, faultString: e.message });
+    }
+  });
 });
 
 // Quit when all windows are closed.

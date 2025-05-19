@@ -20,6 +20,27 @@ window.oveRpcHandler = async (command, args) => {
       case 'setTitle':
         setNewTitle(args && args.name);
         return { ok: true };
+      case 'createFeature':
+        // args: {start, end, name, type, strand}
+        if (!args || args.start == null || args.end == null) {
+          return { error: 'Feature start/end is required' };
+        }
+        // Default options -- DNA is 1-based, inclusive
+        const feature = {
+          name: args.name || 'New Feature',
+          type: args.type || 'misc_feature',
+          start: args.start|0, // integer conversion
+          end: args.end|0,
+          strand: args.strand || 1, // 1 or -1
+        };
+        // Add to features array or create it
+        if (!seqDataToUse.features) seqDataToUse.features = [];
+        seqDataToUse.features.push(feature);
+        // Optionally update editor live view
+        if (typeof editor !== 'undefined' && editor.updateEditor) {
+          editor.updateEditor({ sequenceData: seqDataToUse });
+        }
+        return { ok: true, feature, features: seqDataToUse.features };
       // Add more as needed
       default:
         return { error: `Unknown OVE RPC command: ${command}` };

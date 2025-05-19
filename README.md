@@ -72,6 +72,35 @@ result = proxy.invoke("getSequence", {})
 # Extend 'invoke' for other OVE operations
 ```
 
+#### Create Feature via XML-RPC (Python Demo)
+
+Here is how to programmatically add a feature/annotation to a selected DNA region in the currently open OVE window:
+
+```python
+import xmlrpc.client
+proxy = xmlrpc.client.ServerProxy("http://127.0.0.1:9091/")
+
+# 1. Open your sequence file:
+proxy.openFile("/path/to/file.gb")
+
+# 2. Create a new feature (annotate bases 10-50 on the forward strand):
+# You can modify name/type/strand as needed
+result = proxy.createFeature({
+    "start": 10,   # 0-based, inclusive
+    "end": 50,     # inclusive
+    "name": "DemoFeature",
+    "type": "misc_feature",
+    "strand": 1    # 1 (forward) or -1 (reverse)
+})
+print('createFeature result:', result)
+
+# 3. Fetch all current features as confirmation:
+new_json = proxy.getSeqJson()
+print('Current features:', new_json['features'])
+```
+
+This will add a visible feature/annotation to the loaded sequence in the Electron OVE window.
+
 #### Adding Actions
 To allow a new GUI/editor function via RPC, add an implementation to `window.oveRpcHandler` in `src/renderer.js`, and document its usage.
 
